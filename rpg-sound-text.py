@@ -5,7 +5,6 @@ import time
 import threading
 import os
 
-# Попытка импортировать tkinterdnd2 для drag-and-drop
 DND_SUPPORT = False
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -18,9 +17,9 @@ class RPGTextSoundApp:
     def __init__(self, root_window):
         self.root = root_window
         self.root.title("RPG Text Sound Player")
-        self.root.geometry("700x600")
+        # Попробуем уменьшить начальную высоту окна для тестера
+        self.root.geometry("700x550") # Было 700x600
 
-        # Инициализация Pygame Mixer
         try:
             pygame.mixer.init()
         except pygame.error as e:
@@ -33,40 +32,35 @@ class RPGTextSoundApp:
         self.is_playing = False
         self.playback_thread = None
 
-        # Стили
         style = ttk.Style()
-        style.theme_use('clam') # Можно выбрать 'alt', 'default', 'classic', 'vista', 'xpnative'
+        style.theme_use('clam')
 
-        # --- Элементы управления ---
         controls_frame = ttk.LabelFrame(self.root, text="Управление", padding=(10, 5))
         controls_frame.pack(padx=10, pady=10, fill="x")
 
-        # Выбор звука
         ttk.Button(controls_frame, text="Выбрать звук (.wav)", command=self.select_sound_file).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
         self.sound_label = ttk.Label(controls_frame, text="Звук не выбран")
         self.sound_label.grid(row=0, column=1, columnspan=3, padx=5, pady=5, sticky="w")
 
-        # Скорость текста (интервал)
         ttk.Label(controls_frame, text="Интервал (мс):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.speed_var = tk.IntVar(value=100) # мс между символами
+        self.speed_var = tk.IntVar(value=100)
         self.speed_scale = ttk.Scale(controls_frame, from_=10, to=500, orient="horizontal", variable=self.speed_var, command=lambda s: self.speed_var.set(int(float(s))))
         self.speed_scale.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
         self.speed_entry = ttk.Entry(controls_frame, textvariable=self.speed_var, width=5)
         self.speed_entry.grid(row=1, column=2, padx=5, pady=5)
 
-        # Громкость звука
         ttk.Label(controls_frame, text="Громкость:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        self.volume_var = tk.DoubleVar(value=0.8) # от 0.0 до 1.0
+        self.volume_var = tk.DoubleVar(value=0.8)
         self.volume_scale = ttk.Scale(controls_frame, from_=0.0, to=1.0, orient="horizontal", variable=self.volume_var, command=lambda v: self.volume_var.set(float(v)))
         self.volume_scale.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
         self.volume_entry = ttk.Entry(controls_frame, textvariable=self.volume_var, width=5)
         self.volume_entry.grid(row=2, column=2, padx=5, pady=5)
         
-        controls_frame.columnconfigure(1, weight=1) # Растягивать слайдер
+        controls_frame.columnconfigure(1, weight=1)
 
-        # --- Область для ввода текста ---
-        input_frame = ttk.LabelFrame(self.root, text="Введите или перетащите текст сюда", padding=(10, 5))
-        input_frame.pack(padx=10, pady=5, fill="both", expand=True)
+        input_frame_text = "Введите текст или перетащите .txt файл сюда" if DND_SUPPORT else "Введите текст"
+        input_frame = ttk.LabelFrame(self.root, text=input_frame_text, padding=(10, 5))
+        input_frame.pack(padx=10, pady=5, fill="both", expand=True) # expand=True важен
 
         self.input_text_area = scrolledtext.ScrolledText(input_frame, wrap=tk.WORD, height=10, font=("Arial", 10))
         self.input_text_area.pack(padx=5, pady=5, fill="both", expand=True)
@@ -76,21 +70,18 @@ class RPGTextSoundApp:
             self.input_text_area.dnd_bind('<<Drop>>', self.handle_drop)
             self.input_text_area.dnd_bind('<<DragEnter>>', self.drag_enter)
             self.input_text_area.dnd_bind('<<DragLeave>>', self.drag_leave)
-            input_frame.configure(text="Введите текст или перетащите .txt файл сюда")
         else:
-            ttk.Button(input_frame, text="Загрузить текст из файла (.txt)", command=self.load_text_from_file).pack(pady=5)
+            ttk.Button(input_frame, text="Загрузить текст из файла (.txt)", command=self.load_text_from_file).pack(pady=5, side="bottom")
 
 
-        # --- Область отображения "печатаемого" текста ---
         output_frame = ttk.LabelFrame(self.root, text="Результат", padding=(10, 5))
-        output_frame.pack(padx=10, pady=5, fill="both", expand=True)
+        output_frame.pack(padx=10, pady=5, fill="both", expand=True) # expand=True важен
 
         self.output_text_area = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, height=10, state="disabled", font=("Arial", 12, "bold"))
         self.output_text_area.pack(padx=5, pady=5, fill="both", expand=True)
 
-        # --- Кнопки действий ---
         action_buttons_frame = ttk.Frame(self.root, padding=(10,5))
-        action_buttons_frame.pack(fill="x", padx=10, pady=10)
+        action_buttons_frame.pack(fill="x", padx=10, pady=(5,10)) # Немного отступ снизу
 
         self.play_button = ttk.Button(action_buttons_frame, text="Воспроизвести", command=self.start_playback)
         self.play_button.pack(side="left", padx=5, expand=True, fill="x")
@@ -98,17 +89,12 @@ class RPGTextSoundApp:
         self.stop_button = ttk.Button(action_buttons_frame, text="Остановить", command=self.stop_playback, state="disabled")
         self.stop_button.pack(side="left", padx=5, expand=True, fill="x")
         
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing) # Корректное завершение
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def select_sound_file(self):
         path = filedialog.askopenfilename(
             title="Выберите звуковой файл",
-            filetypes=(
-    ("Audio Files", "*.wav *.ogg *.mp3"), # Показываем сразу несколько типов
-    ("WAV files", "*.wav"),
-    ("OGG files", "*.ogg"),
-    ("MP3 files", "*.mp3"),
-    ("All files", "*.*"))
+            filetypes=(("Audio Files", "*.wav *.ogg *.mp3"),("WAV files", "*.wav"), ("OGG files", "*.ogg"), ("MP3 files", "*.mp3"), ("All files", "*.*"))
         )
         if path:
             try:
@@ -116,7 +102,7 @@ class RPGTextSoundApp:
                 self.sound_path = path
                 self.sound_label.config(text=os.path.basename(path))
             except pygame.error as e:
-                messagebox.showerror("Ошибка звука", f"Не удалось загрузить звук: {e}\nУбедитесь, что это корректный WAV файл.")
+                messagebox.showerror("Ошибка звука", f"Не удалось загрузить звук: {e}\nУбедитесь, что это поддерживаемый аудиофайл.")
                 self.current_sound = None
                 self.sound_path = None
                 self.sound_label.config(text="Ошибка загрузки звука")
@@ -135,25 +121,22 @@ class RPGTextSoundApp:
             except Exception as e:
                 messagebox.showerror("Ошибка файла", f"Не удалось прочитать файл: {e}")
 
-    def drag_enter(self, event):
-        event.widget.focus_force()
-        # Можно добавить визуальное выделение
-        # event.widget.config(background="lightblue")
-        return event.action
+    if DND_SUPPORT:
+        def drag_enter(self, event):
+            event.widget.focus_force()
+            return event.action
 
-    def drag_leave(self, event):
-        # event.widget.config(background="white")
-        pass
+        def drag_leave(self, event):
+            pass
 
-    def handle_drop(self, event):
-        if event.data:
-            filepaths = self.root.tk.splitlist(event.data) # Получаем список путей
-            # Обычно перетаскивают один файл для такого случая
-            if filepaths and filepaths[0].lower().endswith(".txt"):
-                self.load_text_from_file(filepaths[0])
-            elif filepaths:
-                 messagebox.showwarning("Неверный файл", f"Пожалуйста, перетащите .txt файл. Вы перетащили: {os.path.basename(filepaths[0])}")
-        return event.action
+        def handle_drop(self, event):
+            if event.data:
+                filepaths = self.root.tk.splitlist(event.data)
+                if filepaths and filepaths[0].lower().endswith(".txt"):
+                    self.load_text_from_file(filepaths[0])
+                elif filepaths:
+                     messagebox.showwarning("Неверный файл", f"Пожалуйста, перетащите .txt файл. Вы перетащили: {os.path.basename(filepaths[0])}")
+            return event.action
 
     def start_playback(self):
         if self.is_playing:
@@ -167,16 +150,17 @@ class RPGTextSoundApp:
             messagebox.showwarning("Нет текста", "Пожалуйста, введите текст для воспроизведения.")
             return
 
-        self.is_playing = True
+        self.is_playing = True # Устанавливаем флаг в начале
+        
+        # Обновляем GUI перед запуском потока
         self.play_button.config(state="disabled")
         self.stop_button.config(state="normal")
         self.input_text_area.config(state="disabled")
-        self.output_text_area.config(state="normal")
-        self.output_text_area.delete("1.0", tk.END)
-        self.output_text_area.config(state="disabled")
+        
+        self.output_text_area.config(state="normal") # Разрешаем изменения
+        self.output_text_area.delete("1.0", tk.END) # Очищаем
+        # self.output_text_area.config(state="disabled") # Пока не отключаем, текст будет добавляться
 
-
-        # Запускаем воспроизведение в отдельном потоке, чтобы GUI не зависал
         self.playback_thread = threading.Thread(target=self._playback_logic, args=(text_to_play,), daemon=True)
         self.playback_thread.start()
 
@@ -185,62 +169,67 @@ class RPGTextSoundApp:
         volume = self.volume_var.get()
         self.current_sound.set_volume(volume)
 
-        self.output_text_area.config(state="normal")
-        for char in text_to_play:
-            if not self.is_playing: # Проверка для остановки
-                break
-            self.output_text_area.insert(tk.END, char)
-            self.output_text_area.see(tk.END) # Автопрокрутка
-            if char.strip(): # Воспроизводить звук только для непустых символов (опционально)
-                try:
-                    self.current_sound.play()
-                except pygame.error as e:
-                    print(f"Ошибка воспроизведения звука: {e}") # Логируем, но не останавливаем всё
-                    # Можно здесь решить остановить или показать ошибку пользователю
-                    # self.is_playing = False # Например, остановить
-                    # messagebox.showerror("Ошибка звука", f"Произошла ошибка при воспроизведении: {e}")
-                    # break 
-            
-            # Ждем указанный интервал, но проверяем флаг is_playing чаще
-            # чтобы быстрее реагировать на кнопку "Остановить"
-            start_wait = time.time()
-            while (time.time() - start_wait) * 1000 < char_interval_ms:
-                if not self.is_playing:
+        try:
+            for char_to_display in text_to_play:
+                if not self.is_playing: # Проверяем флаг перед каждой операцией
                     break
-                time.sleep(0.001) # Короткая пауза для отзывчивости
-            
-        self.output_text_area.config(state="disabled")
-        self._playback_finished()
+                
+                # Безопасное обновление текстового поля из основного потока
+                self.root.after(0, self._insert_char_in_output, char_to_display)
 
-    def _playback_finished(self):
-        # Эта функция должна вызываться из основного потока Tkinter
-        # если мы обновляем GUI после завершения потока
-        if self.is_playing or self.play_button['state'] == 'disabled': # Проверяем, не было ли уже остановлено
-            self.is_playing = False
-            self.play_button.config(state="normal")
-            self.stop_button.config(state="disabled")
-            self.input_text_area.config(state="normal")
+                if char_to_display.strip():
+                    try:
+                        self.current_sound.play()
+                    except pygame.error as e:
+                        print(f"Ошибка воспроизведения звука: {e}") # Логируем
+                
+                # Точное ожидание с проверкой флага
+                start_wait = time.time()
+                while (time.time() - start_wait) * 1000 < char_interval_ms:
+                    if not self.is_playing:
+                        break
+                    time.sleep(0.001) 
+                if not self.is_playing: # Еще одна проверка после цикла ожидания
+                    break
+        finally:
+            # Гарантированный сброс UI по завершении или прерывании потока,
+            # выполненный в основном потоке.
+            self.root.after(0, self._finalize_playback_ui)
 
+    def _insert_char_in_output(self, char_to_insert):
+        # Эта функция вызывается через root.after, поэтому она в основном потоке
+        # output_text_area должна быть 'normal' для вставки
+        original_state = self.output_text_area.cget("state")
+        self.output_text_area.config(state="normal")
+        self.output_text_area.insert(tk.END, char_to_insert)
+        self.output_text_area.see(tk.END)
+        self.output_text_area.config(state=original_state) # Возвращаем исходное состояние (обычно 'disabled' для пользователя)
+
+    def _finalize_playback_ui(self):
+        # Эта функция вызывается через root.after, поэтому она в основном потоке
+        self.is_playing = False # КРИТИЧНО: сбрасываем флаг для возможности нового запуска
+        
+        self.output_text_area.config(state="disabled") # Отключаем редактирование результата
+        self.play_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+        self.input_text_area.config(state="normal")
 
     def stop_playback(self):
         if self.is_playing:
-            self.is_playing = False # Сигнал потоку для остановки
-            # Ждать завершения потока не обязательно, если он daemon
-            # но можно добавить self.playback_thread.join(timeout=0.5) если нужно
-            # чтобы убедиться, что он завершился перед обновлением GUI
-            # Но это может слегка "подвесить" GUI на время таймаута.
-            # Так как поток часто проверяет is_playing, он должен быстро завершиться.
-            self._playback_finished() # Обновляем UI сразу
+            self.is_playing = False # Сигнализируем потоку остановиться
+            # Поток сам вызовет _finalize_playback_ui при завершении.
+            # Можно добавить немедленное обновление состояния кнопок для отзывчивости,
+            # но финальное состояние все равно установит _finalize_playback_ui.
+            self.stop_button.config(state="disabled") 
+            # self.play_button.config(state="normal") # Можно включить, но _finalize_playback_ui это сделает надежнее
 
     def on_closing(self):
         if self.is_playing:
-            self.stop_playback() # Попытаться остановить воспроизведение
-            # Дать немного времени потоку завершиться, если он был активен
+            self.is_playing = False # Сигнал потоку
             if self.playback_thread and self.playback_thread.is_alive():
-                self.playback_thread.join(0.1) # Небольшой таймаут
+                self.playback_thread.join(0.2) # Дать немного времени на завершение
         pygame.mixer.quit()
         self.root.destroy()
-
 
 if __name__ == "__main__":
     if DND_SUPPORT:
