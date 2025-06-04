@@ -14,15 +14,6 @@ A simple Python application that plays a sound for each character displayed in a
     * Drag-and-drop `.txt` files onto the input area (if `tkinterdnd2` is available).
 * **User-Friendly Interface:** Simple GUI built with Tkinter.
 
-## Screenshot
-
-(Optional but highly recommended: Add a screenshot of your application's GUI here!)
-To add a screenshot:
-1. Take a screenshot of your application.
-2. Upload it to your GitHub repository (you can create an `assets` or `images` folder, or put it in the root).
-3. Link it here using Markdown: `![App Screenshot](path/to/your/screenshot.png)`
-   For example: `![App Screenshot](./app_screenshot.png)`
-
 ## Requirements
 
 * Python 3.6+
